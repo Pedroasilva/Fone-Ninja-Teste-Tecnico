@@ -9,42 +9,44 @@
     <div class="card">
       <h2 class="card-titulo">Cadastrar Produto</h2>
 
-      <div class="campo">
-        <label for="nome">Nome</label>
-        <input
-          id="nome"
-          v-model="form.nome"
-          type="text"
-          placeholder="Nome do produto"
-          :class="{ erro: erros.nome }"
-          data-testid="input-nome"
-        />
-        <span v-if="erros.nome" class="erro-campo">{{ erros.nome }}</span>
-      </div>
+      <form @submit.prevent="cadastrarProduto">
+        <div class="campo">
+          <label for="nome">Nome</label>
+          <input
+            id="nome"
+            v-model="form.nome"
+            type="text"
+            placeholder="Nome do produto"
+            :class="{ erro: erros.nome }"
+            data-testid="input-nome"
+          />
+          <span v-if="erros.nome" class="erro-campo">{{ erros.nome }}</span>
+        </div>
 
-      <div class="campo">
-        <label for="preco_venda">Preço de Venda (R$)</label>
-        <input
-          id="preco_venda"
-          type="text"
-          inputmode="numeric"
-          :value="valorParaMascara(form.preco_venda)"
-          @input="form.preco_venda = onMoedaInput($event)"
-          placeholder="0,00"
-          :class="{ erro: erros.preco_venda }"
-          data-testid="input-preco"
-        />
-        <span v-if="erros.preco_venda" class="erro-campo">{{ erros.preco_venda }}</span>
-      </div>
+        <div class="campo">
+          <label for="preco_venda">Preço de Venda (R$)</label>
+          <input
+            id="preco_venda"
+            type="text"
+            inputmode="numeric"
+            :value="valorParaMascara(form.preco_venda)"
+            @input="form.preco_venda = onMoedaInput($event)"
+            placeholder="0,00"
+            :class="{ erro: erros.preco_venda }"
+            data-testid="input-preco"
+          />
+          <span v-if="erros.preco_venda" class="erro-campo">{{ erros.preco_venda }}</span>
+        </div>
 
-      <button
-        class="btn-primario"
-        :disabled="carregando"
-        data-testid="btn-cadastrar"
-        @click="cadastrarProduto"
-      >
-        {{ carregando ? 'Aguarde...' : 'Cadastrar' }}
-      </button>
+        <button
+          type="submit"
+          class="btn-primario"
+          :disabled="carregando"
+          data-testid="btn-cadastrar"
+        >
+          {{ carregando ? 'Aguarde...' : 'Cadastrar' }}
+        </button>
+      </form>
     </div>
 
     <div class="card">

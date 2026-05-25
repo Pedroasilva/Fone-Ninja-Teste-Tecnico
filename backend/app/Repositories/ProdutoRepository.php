@@ -10,7 +10,7 @@ class ProdutoRepository implements ProdutoRepositoryInterface
 {
     public function all(): Collection
     {
-        return Produto::all(['id', 'nome', 'custo_medio', 'preco_venda', 'estoque']);
+        return Produto::all(['id', 'nome', 'custo_medio', 'preco_venda', 'estoque', 'created_at']);
     }
 
     public function create(array $data): Produto
