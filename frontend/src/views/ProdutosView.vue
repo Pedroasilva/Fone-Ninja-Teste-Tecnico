@@ -26,11 +26,11 @@
         <label for="preco_venda">Preço de Venda (R$)</label>
         <input
           id="preco_venda"
-          v-model="form.preco_venda"
-          type="number"
-          min="0"
-          step="0.01"
-          placeholder="0.00"
+          type="text"
+          inputmode="numeric"
+          :value="valorParaMascara(form.preco_venda)"
+          @input="form.preco_venda = onMoedaInput($event)"
+          placeholder="0,00"
           :class="{ erro: erros.preco_venda }"
           data-testid="input-preco"
         />
@@ -58,13 +58,14 @@
               <th class="right">Custo Médio</th>
               <th class="right">Preço Venda</th>
               <th class="center">Estoque</th>
+              <th>Cadastrado em</th>
             </tr>
           </thead>
           <tbody v-if="carregandoLista">
-            <tr><td colspan="5" style="text-align:center; padding:24px; color:#9CA3AF;">Carregando...</td></tr>
+            <tr><td colspan="6" style="text-align:center; padding:24px; color:#9CA3AF;">Carregando...</td></tr>
           </tbody>
           <tbody v-else-if="produtos.length === 0">
-            <tr><td colspan="5" style="text-align:center; padding:24px; color:#9CA3AF;">Nenhum produto cadastrado.</td></tr>
+            <tr><td colspan="6" style="text-align:center; padding:24px; color:#9CA3AF;">Nenhum produto cadastrado.</td></tr>
           </tbody>
           <tbody v-else>
             <tr v-for="produto in produtos" :key="produto.id">
@@ -73,6 +74,7 @@
               <td class="right">{{ formatarMoeda(produto.custo_medio) }}</td>
               <td class="right">{{ formatarMoeda(produto.preco_venda) }}</td>
               <td class="center">{{ produto.estoque }}</td>
+              <td>{{ formatarData(produto.created_at) }}</td>
             </tr>
           </tbody>
         </table>
@@ -84,7 +86,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import api from '../api'
-import { formatarMoeda } from '../utils/format'
+import { formatarMoeda, valorParaMascara, onMoedaInput } from '../utils/format'
 
 const produtos        = ref([])
 const carregando      = ref(false)
@@ -124,6 +126,11 @@ function validar() {
   return valido
 }
 
+function formatarData(dateStr) {
+  if (!dateStr) return '-'
+  return new Date(dateStr).toLocaleDateString('pt-BR')
+}
+
 async function cadastrarProduto() {
   if (!validar()) return
 
@@ -141,8 +148,12 @@ async function cadastrarProduto() {
     await carregarProdutos()
     setTimeout(() => { mensagem.value = null }, 5000)
   } catch (error) {
-    const texto = error.response?.data?.message ?? 'Erro inesperado. Tente novamente.'
-    mensagem.value = { tipo: 'erro', texto }
+    const errosApi = error.response?.data?.errors ?? {}
+    if (errosApi.nome)        erros.nome        = errosApi.nome[0]
+    if (errosApi.preco_venda) erros.preco_venda = errosApi.preco_venda[0]
+    if (!Object.keys(errosApi).length) {
+      mensagem.value = { tipo: 'erro', texto: error.response?.data?.message ?? 'Erro inesperado. Tente novamente.' }
+    }
   } finally {
     carregando.value = false
   }

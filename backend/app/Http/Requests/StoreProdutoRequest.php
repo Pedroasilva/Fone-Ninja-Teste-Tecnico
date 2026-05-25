@@ -14,7 +14,7 @@ class StoreProdutoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nome'        => ['required', 'string', 'min:3', 'max:255'],
+            'nome'        => ['required', 'string', 'min:3', 'max:255', 'unique:produtos,nome'],
             'preco_venda' => ['required', 'numeric', 'min:0'],
         ];
     }
@@ -24,6 +24,7 @@ class StoreProdutoRequest extends FormRequest
         return [
             'nome.required'        => 'O nome do produto é obrigatório.',
             'nome.min'             => 'O nome deve ter pelo menos 3 caracteres.',
+            'nome.unique'          => 'Já existe um produto cadastrado com esse nome.',
             'preco_venda.required' => 'O preço de venda é obrigatório.',
             'preco_venda.numeric'  => 'O preço de venda deve ser um número.',
             'preco_venda.min'      => 'O preço de venda não pode ser negativo.',

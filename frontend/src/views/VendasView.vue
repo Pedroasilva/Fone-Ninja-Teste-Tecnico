@@ -58,11 +58,11 @@
 
         <div>
           <input
-            v-model.number="item.preco_unitario"
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="R$/un"
+            type="text"
+            inputmode="numeric"
+            :value="valorParaMascara(item.preco_unitario)"
+            @input="item.preco_unitario = onMoedaInput($event)"
+            placeholder="0,00"
             :class="{ erro: erros.itens[index]?.preco_unitario }"
             data-testid="input-preco-venda"
           />
@@ -117,6 +117,7 @@
             <tr>
               <th class="center">ID</th>
               <th>Cliente</th>
+              <th>Itens</th>
               <th class="right">Total</th>
               <th class="right">Lucro</th>
               <th class="center">Status</th>
@@ -124,15 +125,28 @@
             </tr>
           </thead>
           <tbody v-if="carregandoLista">
-            <tr><td colspan="6" style="text-align:center; padding:24px; color:#9CA3AF;">Carregando...</td></tr>
+            <tr><td colspan="7" style="text-align:center; padding:24px; color:#9CA3AF;">Carregando...</td></tr>
           </tbody>
           <tbody v-else-if="vendas.length === 0">
-            <tr><td colspan="6" style="text-align:center; padding:24px; color:#9CA3AF;">Nenhuma venda registrada.</td></tr>
+            <tr><td colspan="7" style="text-align:center; padding:24px; color:#9CA3AF;">Nenhuma venda registrada.</td></tr>
           </tbody>
           <tbody v-else>
             <tr v-for="venda in vendas" :key="venda.id">
               <td class="center">{{ venda.id }}</td>
               <td>{{ venda.cliente }}</td>
+              <td>
+                <ul style="margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:2px;">
+                  <li
+                    v-for="produto in venda.produtos"
+                    :key="produto.id"
+                    style="font-size:0.8125rem; color:#374151; white-space:nowrap;"
+                  >
+                    {{ produto.nome }}
+                    <span style="color:#6B7280;">× {{ produto.pivot.quantidade }}</span>
+                    <span style="color:#9CA3AF; margin-left:4px;">({{ formatarMoeda(produto.pivot.preco_unitario) }}/un)</span>
+                  </li>
+                </ul>
+              </td>
               <td class="right">{{ formatarMoeda(venda.total) }}</td>
               <td class="right" :style="{ color: parseFloat(venda.lucro) >= 0 ? '#15803D' : '#DC2626' }">
                 {{ formatarMoeda(venda.lucro) }}
@@ -154,7 +168,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import api from '../api'
-import { formatarMoeda } from '../utils/format'
+import { formatarMoeda, valorParaMascara, onMoedaInput } from '../utils/format'
 
 const produtos        = ref([])
 const vendas          = ref([])
