@@ -4,10 +4,89 @@ Sistema ERP de estoque desacoplado: API REST em Laravel (backend) + SPA em Vue 3
 
 ---
 
+## Como subir o projeto
+
+### Pré-requisitos
+
+- [Docker](https://docs.docker.com/get-docker/) 24+
+- [Docker Compose](https://docs.docker.com/compose/) v2+
+- [Make](https://www.gnu.org/software/make/)
+
+### Passo a passo
+
+```bash
+# 1. Clonar o repositório
+git clone https://github.com/pedrosilva46/Fone-Ninja-Teste-Tecnico.git
+cd Fone-Ninja-Teste-Tecnico
+
+# 2. Construir as imagens e subir os serviços
+make up-build
+```
+
+Aguarde o backend exibir `INFO  Server running on [http://0.0.0.0:8000]`.  
+As migrations são executadas automaticamente pelo `entrypoint.sh`.
+
+- **Frontend (Vue):** [http://localhost:5173](http://localhost:5173)
+- **Backend (API):** [http://localhost:8000/api](http://localhost:8000/api)
+- **Banco (MySQL):** `localhost:3306`
+
+### Comandos disponíveis
+
+```bash
+make up-build        # Reconstrói as imagens e sobe os serviços
+make up              # Sobe os serviços sem rebuild
+make down            # Para e remove os containers
+make restart         # Reinicia os serviços
+make logs            # Acompanha logs de todos os serviços
+make logs-backend    # Logs apenas do backend
+make logs-frontend   # Logs apenas do frontend
+make ps              # Lista containers em execução
+
+make test            # Roda todos os testes (backend + frontend)
+make test-backend    # Testes PHPUnit completos
+make test-backend-unit    # Apenas testes unitários
+make test-backend-feature # Apenas testes de feature
+make test-frontend   # Testes Vitest
+
+make migrate         # Executa migrations
+make migrate-fresh   # Recria o banco do zero
+make tinker          # REPL do Laravel
+make shell-backend   # Shell no container do backend
+make shell-frontend  # Shell no container do frontend
+```
+
+> Execute `make help` para ver todos os comandos com descrição.
+
+### Variáveis de ambiente
+
+O frontend já vem configurado com `VITE_API_URL=http://localhost:8000` via `docker-compose.yml`.  
+Para sobrescrever, crie `frontend/.env.local`:
+
+```env
+VITE_API_URL=http://seu-host:8000
+```
+
+### Endpoints da API
+
+```text
+GET    /api/produtos        Lista produtos
+POST   /api/produtos        Cadastra produto
+
+GET    /api/compras         Lista compras com produtos
+POST   /api/compras         Registra compra (atualiza estoque e custo médio)
+
+GET    /api/vendas          Lista vendas com produtos
+POST   /api/vendas          Registra venda (valida estoque, calcula lucro)
+DELETE /api/vendas/{id}     Cancela venda (reverte estoque)
+```
+
+---
+
 ## Arquitetura
 
 ```text
 /
+├── Makefile
 ├── docker-compose.yml
 ├── backend/          # API Laravel 13 (PHP 8.4)
 │   ├── Dockerfile
@@ -29,16 +108,6 @@ Sistema ERP de estoque desacoplado: API REST em Laravel (backend) + SPA em Vue 3
         └── __tests__/          # Vitest + @vue/test-utils
 ```
 
-### Princípios SOLID aplicados
-
-| Princípio | Onde |
-| --------- | ---- |
-| **S** — Single Responsibility | `CustoMedioCalculator` é responsável apenas pelo cálculo do custo médio ponderado |
-| **O** — Open/Closed | Repositórios e serviços implementam interfaces; novas implementações não alteram o código existente |
-| **L** — Liskov Substitution | Qualquer implementação das interfaces de repositório pode substituir outra |
-| **I** — Interface Segregation | Interfaces separadas por entidade (`ProdutoRepositoryInterface`, `CompraRepositoryInterface`, `VendaRepositoryInterface`) |
-| **D** — Dependency Inversion | Controllers e Services recebem dependências pelo construtor; `AppServiceProvider` resolve os bindings |
-
 ### Fluxo de dados
 
 ```text
@@ -49,6 +118,16 @@ HTTP Request
     → Repository (persistência via Eloquent)
     → Response JSON
 ```
+
+### Princípios SOLID aplicados
+
+| Princípio | Onde |
+| --------- | ---- |
+| **S** — Single Responsibility | `CustoMedioCalculator` é responsável apenas pelo cálculo do custo médio ponderado |
+| **O** — Open/Closed | Repositórios e serviços implementam interfaces; novas implementações não alteram o código existente |
+| **L** — Liskov Substitution | Qualquer implementação das interfaces de repositório pode substituir outra |
+| **I** — Interface Segregation | Interfaces separadas por entidade (`ProdutoRepositoryInterface`, `CompraRepositoryInterface`, `VendaRepositoryInterface`) |
+| **D** — Dependency Inversion | Controllers e Services recebem dependências pelo construtor; `AppServiceProvider` resolve os bindings |
 
 ### Regras de negócio principais
 
@@ -61,22 +140,6 @@ HTTP Request
 - **Estoque**: validado com `lockForUpdate()` dentro de transação para evitar race conditions; retorna 422 se insuficiente.
 
 - **Cancelamento de venda**: reverte o estoque e marca `cancelada = true`; idempotente (lança 422 se já cancelada).
-
----
-
-## Uso de IA
-
-Este projeto foi implementado com auxílio do **Claude Code** (Anthropic) via VSCode Extension.
-
-A IA foi utilizada para:
-
-- Scaffolding completo do projeto Laravel e Vue com base nas especificações definidas em `.claude/specs/`
-- Geração de migrations, models, repositories, services e controllers seguindo a arquitetura Controller → Service → Repository com SOLID
-- Escrita da suíte de testes (PHPUnit unit + feature, Vitest + vue/test-utils)
-- Configuração do Docker Compose, Dockerfiles e entrypoint
-- Resolução de bugs de compatibilidade (PHPUnit mock de métodos `void`, `createPartialMock` para evitar chamadas ao DB, tipos intersection no PHP 8.4)
-
-As especificações técnicas foram definidas manualmente pelo desenvolvedor em `.claude/specs/` (database, backend, frontend, design, tests) antes da geração do código.
 
 ---
 
@@ -94,12 +157,10 @@ As especificações técnicas foram definidas manualmente pelo desenvolvedor em 
 | Feature — `CompraTest` | 4 | Idem, valida custo médio após compra |
 | Feature — `VendaTest` | 6 | Idem, inclui cancelamento e rollback de estoque |
 
-**Rodar localmente (dentro do container):**
-
 ```bash
-docker compose exec backend php artisan test
-# Apenas unitários (sem SQLite no host):
-docker compose exec backend php artisan test --testsuite=Unit
+make test-backend          # Todos os testes do backend
+make test-backend-unit     # Apenas unitários (não requer SQLite no host)
+make test-backend-feature  # Apenas feature tests
 ```
 
 ### Frontend (Vitest)
@@ -111,58 +172,22 @@ docker compose exec backend php artisan test --testsuite=Unit
 | `ComprasView.test.js` | 5 | Adicionar/remover itens, registrar compra |
 | `VendasView.test.js` | 3 | Cálculo de total/lucro em tempo real, sucesso e erro de estoque |
 
-**Rodar:**
-
 ```bash
-docker compose exec frontend npm run test
+make test-frontend
 ```
 
 ---
 
-## Como clonar e subir o projeto
+## Uso de IA
 
-### Pré-requisitos
+Este projeto foi implementado com auxílio do **Claude Code** (Anthropic) via VSCode Extension.
 
-- [Docker](https://docs.docker.com/get-docker/) 24+
-- [Docker Compose](https://docs.docker.com/compose/) v2+
+A IA foi utilizada para:
 
-### Passo a passo
+- Scaffolding completo do projeto Laravel e Vue com base nas especificações definidas em `.claude/specs/`
+- Geração de migrations, models, repositories, services e controllers seguindo a arquitetura Controller → Service → Repository com SOLID
+- Escrita da suíte de testes (PHPUnit unit + feature, Vitest + vue/test-utils)
+- Configuração do Docker Compose, Dockerfiles e entrypoint
+- Resolução de bugs de compatibilidade (PHPUnit mock de métodos `void`, `createPartialMock` para evitar chamadas ao DB, tipos intersection no PHP 8.4)
 
-```bash
-# 1. Clonar o repositório
-git clone https://github.com/pedrosilva46/Fone-Ninja-Teste-Tecnico.git
-cd Fone-Ninja-Teste-Tecnico
-
-# 2. Subir todos os serviços (build automático na primeira vez)
-docker compose up --build
-```
-
-Aguarde o backend exibir `INFO  Server running on [http://0.0.0.0:8000]`.  
-As migrations são executadas automaticamente pelo `entrypoint.sh`.
-
-- **Frontend (Vue):** [http://localhost:5173](http://localhost:5173)
-- **Backend (API):** [http://localhost:8000/api](http://localhost:8000/api)
-- **Banco (MySQL):** `localhost:3306`
-
-### Variáveis de ambiente
-
-O frontend já vem configurado com `VITE_API_URL=http://localhost:8000` via `docker-compose.yml`.  
-Para sobrescrever, crie `frontend/.env.local`:
-
-```env
-VITE_API_URL=http://seu-host:8000
-```
-
-### Endpoints disponíveis
-
-```
-GET  /api/produtos          Lista produtos
-POST /api/produtos          Cadastra produto
-
-GET  /api/compras           Lista compras com produtos
-POST /api/compras           Registra compra (atualiza estoque e custo médio)
-
-GET  /api/vendas            Lista vendas com produtos
-POST /api/vendas            Registra venda (valida estoque, calcula lucro)
-DELETE /api/vendas/{id}     Cancela venda (reverte estoque)
-```
+As especificações técnicas foram definidas manualmente pelo desenvolvedor em `.claude/specs/` (database, backend, frontend, design, tests) antes da geração do código.
