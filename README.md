@@ -1,124 +1,168 @@
-# 🧪 Desafio Técnico – Laravel + Vue
+# ERP de Estoque — Laravel + Vue
 
-Bem-vindo(a)! 👋  
-Este desafio tem como objetivo avaliar suas habilidades práticas em **Laravel (backend)** e **Vue (frontend)**.  
-
----
-
-## 📌 Contexto
-Você foi contratado para implementar funcionalidades de um **ERP de estoque**.  
-O sistema precisa permitir **cadastrar produtos**, **registrar compras e vendas**, controlar **estoque** e calcular **lucro**.
+Sistema ERP de estoque desacoplado: API REST em Laravel (backend) + SPA em Vue 3 (frontend), orquestrados via Docker Compose com banco MySQL 8.
 
 ---
 
-## 🎯 Objetivos do desafio
-- Criar **cadastro de produtos**.  
-- Implementar **compra de produtos** (entrada de estoque e atualização do custo médio).  
-- Implementar **venda de produtos** (saída de estoque, cálculo de receita e lucro).  
-- Criar **telas em Vue** para gerenciar produtos, compras e vendas.
-- Criar um ambiente dockerizado com backend, frontend e banco, contendo dockerfile para o front e back e docker composer com os dois serviços mais banco de dados mysql.
-- o projeto deve ser descoplado oh seja a estrutura deve ser de um projeto backend sendo a api e o frontend desacoplado do back.
-  /projeto
-│
+## Arquitetura
+
+```text
+/
 ├── docker-compose.yml
-│
-├── frontend/
-│   └── Dockerfile
-│
-└── backend/
-    └── Dockerfile
+├── backend/          # API Laravel 13 (PHP 8.4)
+│   ├── Dockerfile
+│   ├── app/
+│   │   ├── Http/Controllers/   # Controladores finos — só delegam
+│   │   ├── Http/Requests/      # Form Requests com validação e msgs em PT-BR
+│   │   ├── Services/           # Regras de negócio (custo médio, estoque, lucro)
+│   │   ├── Repositories/       # Acesso a dados isolado atrás de interfaces
+│   │   └── Models/             # Eloquent ORM
+│   └── tests/
+│       ├── Unit/               # Testes de serviços com mocks (sem DB)
+│       └── Feature/            # Testes de endpoints HTTP com SQLite in-memory
+└── frontend/         # SPA Vue 3.5 (Vite 6)
+    ├── Dockerfile
+    └── src/
+        ├── views/              # ProdutosView, ComprasView, VendasView
+        ├── router/             # Vue Router 5
+        ├── api.js              # Axios configurado via VITE_API_URL
+        └── __tests__/          # Vitest + @vue/test-utils
+```
+
+### Princípios SOLID aplicados
+
+| Princípio | Onde |
+| --------- | ---- |
+| **S** — Single Responsibility | `CustoMedioCalculator` é responsável apenas pelo cálculo do custo médio ponderado |
+| **O** — Open/Closed | Repositórios e serviços implementam interfaces; novas implementações não alteram o código existente |
+| **L** — Liskov Substitution | Qualquer implementação das interfaces de repositório pode substituir outra |
+| **I** — Interface Segregation | Interfaces separadas por entidade (`ProdutoRepositoryInterface`, `CompraRepositoryInterface`, `VendaRepositoryInterface`) |
+| **D** — Dependency Inversion | Controllers e Services recebem dependências pelo construtor; `AppServiceProvider` resolve os bindings |
+
+### Fluxo de dados
+
+```text
+HTTP Request
+    → Form Request (validação)
+    → Controller (delega)
+    → Service (regra de negócio, DB::transaction)
+    → Repository (persistência via Eloquent)
+    → Response JSON
+```
+
+### Regras de negócio principais
+
+- **Custo médio ponderado** (atualizado a cada compra):  
+  `(estoque_atual × custo_médio + quantidade × preço_unitário) / (estoque_atual + quantidade)`
+
+- **Lucro por venda** (calculado com snapshot do custo no momento da venda):  
+  `(preço_unitário_venda − custo_médio_snapshot) × quantidade`
+
+- **Estoque**: validado com `lockForUpdate()` dentro de transação para evitar race conditions; retorna 422 se insuficiente.
+
+- **Cancelamento de venda**: reverte o estoque e marca `cancelada = true`; idempotente (lança 422 se já cancelada).
 
 ---
 
-## 🛠️ Backend – Laravel
-Implemente os seguintes endpoints:
+## Uso de IA
 
-### Produtos
-- **Cadastrar produto**  
-  `POST /api/produtos`  
-  Campos:  
-  - `nome` (obrigatório, mínimo 3 caracteres)  
-  - `preco_venda` (valor sugerido de venda, deve ser positivo)  
-  - `estoque_inicial = 0`  
+Este projeto foi implementado com auxílio do **Claude Code** (Anthropic) via VSCode Extension.
 
-- **Listar produtos**  
-  `GET /api/produtos`  
-  Retornar: id, nome, custo_medio, preco_venda e estoque atual.  
+A IA foi utilizada para:
+
+- Scaffolding completo do projeto Laravel e Vue com base nas especificações definidas em `.claude/specs/`
+- Geração de migrations, models, repositories, services e controllers seguindo a arquitetura Controller → Service → Repository com SOLID
+- Escrita da suíte de testes (PHPUnit unit + feature, Vitest + vue/test-utils)
+- Configuração do Docker Compose, Dockerfiles e entrypoint
+- Resolução de bugs de compatibilidade (PHPUnit mock de métodos `void`, `createPartialMock` para evitar chamadas ao DB, tipos intersection no PHP 8.4)
+
+As especificações técnicas foram definidas manualmente pelo desenvolvedor em `.claude/specs/` (database, backend, frontend, design, tests) antes da geração do código.
 
 ---
 
-### Compras
-- **Registrar compra**  
-  `POST /api/compras`  
-  Payload:
-  ```json
-  {
-    "fornecedor": "Fornecedor X",
-    "produtos": [
-      { "id": 1, "quantidade": 50, "preco_unitario": 20 },
-      { "id": 2, "quantidade": 30, "preco_unitario": 10 }
-    ]
-  }
-  ```
+## Testes
 
-### Regras:
+### Backend (PHPUnit)
 
-  - Atualizar estoque (entrada).
+| Suíte | Qtd | Estratégia |
+| ----- | --- | ---------- |
+| Unit — `CustoMedioCalculatorTest` | 3 | Matemática pura, sem framework |
+| Unit — `ProdutoServiceTest` | 2 | Mock do repositório, sem DB |
+| Unit — `CompraServiceTest` | 1 | Mock do repositório + `createPartialMock` para Eloquent |
+| Unit — `VendaServiceTest` | 3 | Idem, inclui testes de exceção de estoque e venda já cancelada |
+| Feature — `ProdutoTest` | 3 | HTTP contra SQLite in-memory (`RefreshDatabase`) |
+| Feature — `CompraTest` | 4 | Idem, valida custo médio após compra |
+| Feature — `VendaTest` | 6 | Idem, inclui cancelamento e rollback de estoque |
 
-  - Atualizar custo médio do produto
+**Rodar localmente (dentro do container):**
 
-💰 Vendas
+```bash
+docker compose exec backend php artisan test
+# Apenas unitários (sem SQLite no host):
+docker compose exec backend php artisan test --testsuite=Unit
+```
 
-Registrar venda
-POST /api/vendas
-Payload:
-  ```json
-  {
-    "cliente": "Fulano da Silva",
-    "produtos": [
-      { "id": 1, "quantidade": 2, "preco_unitario": 50 },
-      { "id": 3, "quantidade": 1, "preco_unitario": 100 }
-    ]
-  }
-  ```
+### Frontend (Vitest)
 
-Regras:
-  
-  - Validar estoque suficiente.
-  
-  - Baixar estoque (saída).
-  
-  - Calcular lucro da venda
+| Arquivo | Qtd | O que testa |
+| ------- | --- | ----------- |
+| `format.test.js` | 4 | `formatarMoeda` — formatação pt-BR |
+| `ProdutosView.test.js` | 3 | Listagem, cadastro e erro de API |
+| `ComprasView.test.js` | 5 | Adicionar/remover itens, registrar compra |
+| `VendasView.test.js` | 3 | Cálculo de total/lucro em tempo real, sucesso e erro de estoque |
 
+**Rodar:**
 
-  - Retornar no JSON o total da venda e o lucro calculado.
+```bash
+docker compose exec frontend npm run test
+```
 
-  - Cancelar venda (opcional)
+---
 
-  - Deve reverter o estoque.
+## Como clonar e subir o projeto
 
-💻 Frontend – Vue
+### Pré-requisitos
 
-Implemente as seguintes telas:
+- [Docker](https://docs.docker.com/get-docker/) 24+
+- [Docker Compose](https://docs.docker.com/compose/) v2+
 
-  - Cadastro de produto
+### Passo a passo
 
-  - Formulário com nome e preço de venda sugerido.
+```bash
+# 1. Clonar o repositório
+git clone https://github.com/pedrosilva46/Fone-Ninja-Teste-Tecnico.git
+cd Fone-Ninja-Teste-Tecnico
 
-  - Mostrar lista de produtos com custo médio, preço e estoque.
+# 2. Subir todos os serviços (build automático na primeira vez)
+docker compose up --build
+```
 
-  - Cadastro de compra
+Aguarde o backend exibir `INFO  Server running on [http://0.0.0.0:8000]`.  
+As migrations são executadas automaticamente pelo `entrypoint.sh`.
 
-  - Formulário para adicionar produtos, quantidades e preço unitário.
+- **Frontend (Vue):** [http://localhost:5173](http://localhost:5173)
+- **Backend (API):** [http://localhost:8000/api](http://localhost:8000/api)
+- **Banco (MySQL):** `localhost:3306`
 
-  - Atualizar estoque e custo médio.
+### Variáveis de ambiente
 
-  - Cadastro de venda
+O frontend já vem configurado com `VITE_API_URL=http://localhost:8000` via `docker-compose.yml`.  
+Para sobrescrever, crie `frontend/.env.local`:
 
-  - Formulário para selecionar produtos e quantidades.
+```env
+VITE_API_URL=http://seu-host:8000
+```
 
-  - Mostrar total da venda e lucro estimado.
+### Endpoints disponíveis
 
-  - Exibir mensagens de sucesso ou erro (ex: “Estoque insuficiente”).
+```
+GET  /api/produtos          Lista produtos
+POST /api/produtos          Cadastra produto
 
-⚡ Diferencial: Tela para listar todas as vendas e compras.
+GET  /api/compras           Lista compras com produtos
+POST /api/compras           Registra compra (atualiza estoque e custo médio)
+
+GET  /api/vendas            Lista vendas com produtos
+POST /api/vendas            Registra venda (valida estoque, calcula lucro)
+DELETE /api/vendas/{id}     Cancela venda (reverte estoque)
+```
