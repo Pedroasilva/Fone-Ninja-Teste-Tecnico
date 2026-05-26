@@ -5,6 +5,7 @@
       <RouterLink to="/">Produtos</RouterLink>
       <RouterLink to="/compras">Compras</RouterLink>
       <RouterLink to="/vendas">Vendas</RouterLink>
+      <RouterLink to="/relatorio">Relatório</RouterLink>
     </nav>
   </header>
   <main>
