@@ -7,12 +7,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Venda extends Model
 {
-    protected $fillable = ['cliente', 'total', 'lucro', 'cancelada'];
+    protected $fillable = ['cliente', 'total', 'lucro', 'cancelada', 'cancelada_em'];
 
     protected $casts = [
-        'total'     => 'decimal:2',
-        'lucro'     => 'decimal:2',
-        'cancelada' => 'boolean',
+        'total'        => 'decimal:2',
+        'lucro'        => 'decimal:2',
+        'cancelada'    => 'boolean',
+        'cancelada_em' => 'datetime',
     ];
 
     public function produtos(): BelongsToMany

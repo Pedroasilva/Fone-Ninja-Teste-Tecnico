@@ -248,6 +248,6 @@ async function registrarCompra() {
 
 function formatarData(dateStr) {
   if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleDateString('pt-BR')
+  return new Date(dateStr).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 }
 </script>

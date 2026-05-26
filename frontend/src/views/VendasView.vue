@@ -122,13 +122,14 @@
               <th class="right">Lucro</th>
               <th class="center">Status</th>
               <th>Data</th>
+              <th></th>
             </tr>
           </thead>
           <tbody v-if="carregandoLista">
-            <tr><td colspan="7" style="text-align:center; padding:24px; color:#9CA3AF;">Carregando...</td></tr>
+            <tr><td colspan="8" style="text-align:center; padding:24px; color:#9CA3AF;">Carregando...</td></tr>
           </tbody>
           <tbody v-else-if="vendas.length === 0">
-            <tr><td colspan="7" style="text-align:center; padding:24px; color:#9CA3AF;">Nenhuma venda registrada.</td></tr>
+            <tr><td colspan="8" style="text-align:center; padding:24px; color:#9CA3AF;">Nenhuma venda registrada.</td></tr>
           </tbody>
           <tbody v-else>
             <tr v-for="venda in vendas" :key="venda.id">
@@ -156,12 +157,47 @@
                   {{ venda.cancelada ? 'Cancelada' : 'Ativa' }}
                 </span>
               </td>
-              <td>{{ formatarData(venda.created_at) }}</td>
+              <td>
+                <div style="font-size:0.8125rem; color:#374151;">
+                  <span style="color:#6B7280; font-size:0.75rem;">Compra</span><br>
+                  {{ formatarData(venda.created_at) }}
+                </div>
+                <div v-if="venda.cancelada_em" style="margin-top:6px; font-size:0.8125rem; color:#DC2626;">
+                  <span style="color:#9CA3AF; font-size:0.75rem;">Cancelamento</span><br>
+                  {{ formatarData(venda.cancelada_em) }}
+                </div>
+              </td>
+              <td class="center">
+                <button
+                  v-if="!venda.cancelada"
+                  class="btn-perigo"
+                  :disabled="cancelando === venda.id"
+                  style="font-size:0.75rem; padding:4px 10px;"
+                  @click="cancelarVenda(venda.id)"
+                >
+                  {{ cancelando === venda.id ? '...' : 'Cancelar' }}
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
+
+    <Transition name="modal">
+      <div v-if="modalVendaId !== null" class="modal-overlay" @click.self="modalVendaId = null">
+        <div class="modal">
+          <h3 class="modal-titulo">Cancelar venda</h3>
+          <p class="modal-texto">Tem certeza que deseja cancelar a venda <strong>#{{ modalVendaId }}</strong>? O estoque dos itens será revertido.</p>
+          <div class="modal-acoes">
+            <button class="btn-secundario" @click="modalVendaId = null">Voltar</button>
+            <button class="btn-perigo" :disabled="cancelando !== null" @click="confirmarCancelamento">
+              {{ cancelando !== null ? 'Cancelando...' : 'Confirmar cancelamento' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -174,6 +210,8 @@ const produtos        = ref([])
 const vendas          = ref([])
 const carregando      = ref(false)
 const carregandoLista = ref(false)
+const cancelando      = ref(null)
+const modalVendaId    = ref(null)
 const mensagem        = ref(null)
 
 const novoItem = () => ({ produto_id: '', quantidade: 1, preco_unitario: '' })
@@ -291,8 +329,88 @@ async function registrarVenda() {
   }
 }
 
+function cancelarVenda(id) {
+  modalVendaId.value = id
+}
+
+async function confirmarCancelamento() {
+  cancelando.value = modalVendaId.value
+  mensagem.value   = null
+
+  try {
+    await api.delete(`/vendas/${modalVendaId.value}`)
+    modalVendaId.value = null
+    mensagem.value = { tipo: 'sucesso', texto: 'Venda cancelada. Estoque revertido.' }
+    await Promise.all([carregarProdutos(), carregarVendas()])
+    setTimeout(() => { mensagem.value = null }, 5000)
+  } catch (error) {
+    modalVendaId.value = null
+    mensagem.value = { tipo: 'erro', texto: error.response?.data?.message ?? 'Erro ao cancelar a venda.' }
+  } finally {
+    cancelando.value = null
+  }
+}
+
 function formatarData(dateStr) {
   if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleDateString('pt-BR')
+  return new Date(dateStr).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 }
 </script>
+
+<style scoped>
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 8px;
+  padding: 28px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.modal-titulo {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 12px;
+}
+
+.modal-texto {
+  font-size: 0.9375rem;
+  color: #4B5563;
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+
+.modal-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.15s ease;
+}
+.modal-enter-active .modal,
+.modal-leave-active .modal {
+  transition: transform 0.15s ease;
+}
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+.modal-enter-from .modal,
+.modal-leave-to .modal {
+  transform: scale(0.95);
+}
+</style>

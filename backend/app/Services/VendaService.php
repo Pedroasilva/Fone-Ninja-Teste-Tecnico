@@ -88,7 +88,8 @@ class VendaService implements VendaServiceInterface
                 $this->produtos->save($produtoAtual);
             }
 
-            $venda->cancelada = true;
+            $venda->cancelada    = true;
+            $venda->cancelada_em = now();
             $this->vendas->save($venda);
 
             return $venda;
