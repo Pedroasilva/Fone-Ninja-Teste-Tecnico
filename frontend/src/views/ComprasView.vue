@@ -116,21 +116,9 @@
             <tr v-for="compra in compras" :key="compra.id">
               <td class="center">{{ compra.id }}</td>
               <td>{{ compra.fornecedor }}</td>
-              <td>
-                <ul style="margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:2px;">
-                  <li
-                    v-for="produto in compra.produtos"
-                    :key="produto.id"
-                    style="font-size:0.8125rem; color:#374151; white-space:nowrap;"
-                  >
-                    {{ produto.nome }}
-                    <span style="color:#6B7280;">× {{ produto.pivot.quantidade }}</span>
-                    <span style="color:#9CA3AF; margin-left:4px;">({{ formatarMoeda(produto.pivot.preco_unitario) }}/un)</span>
-                  </li>
-                </ul>
-              </td>
+              <td><ItemList :produtos="compra.produtos" /></td>
               <td class="right">{{ formatarMoeda(compra.total) }}</td>
-              <td>{{ formatarData(compra.created_at) }}</td>
+              <td><DataCell :data="compra.created_at" /></td>
             </tr>
           </tbody>
         </table>
@@ -143,6 +131,8 @@
 import { ref, reactive, onMounted } from 'vue'
 import api from '../api'
 import { formatarMoeda, valorParaMascara, onMoedaInput } from '../utils/format'
+import ItemList from '../components/ItemList.vue'
+import DataCell from '../components/DataCell.vue'
 
 const produtos        = ref([])
 const compras         = ref([])
@@ -246,8 +236,4 @@ async function registrarCompra() {
   }
 }
 
-function formatarData(dateStr) {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
-}
 </script>

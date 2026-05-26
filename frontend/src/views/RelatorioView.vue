@@ -86,17 +86,9 @@
             <tr v-for="compra in comprasFiltradas" :key="compra.id">
               <td class="center">{{ compra.id }}</td>
               <td>{{ compra.fornecedor }}</td>
-              <td>
-                <ul class="lista-itens">
-                  <li v-for="produto in compra.produtos" :key="produto.id">
-                    {{ produto.nome }}
-                    <span class="qtd">× {{ produto.pivot.quantidade }}</span>
-                    <span class="preco">({{ formatarMoeda(produto.pivot.preco_unitario) }}/un)</span>
-                  </li>
-                </ul>
-              </td>
+              <td><ItemList :produtos="compra.produtos" /></td>
               <td class="right">{{ formatarMoeda(compra.total) }}</td>
-              <td>{{ formatarData(compra.created_at) }}</td>
+              <td><DataCell :data="compra.created_at" /></td>
             </tr>
           </tbody>
         </table>
@@ -132,34 +124,13 @@
             <tr v-for="venda in vendasFiltradas" :key="venda.id" :class="{ 'linha-cancelada': venda.cancelada }">
               <td class="center">{{ venda.id }}</td>
               <td>{{ venda.cliente }}</td>
-              <td>
-                <ul class="lista-itens">
-                  <li v-for="produto in venda.produtos" :key="produto.id">
-                    {{ produto.nome }}
-                    <span class="qtd">× {{ produto.pivot.quantidade }}</span>
-                    <span class="preco">({{ formatarMoeda(produto.pivot.preco_unitario) }}/un)</span>
-                  </li>
-                </ul>
-              </td>
+              <td><ItemList :produtos="venda.produtos" /></td>
               <td class="right">{{ formatarMoeda(venda.total) }}</td>
               <td class="right" :style="{ color: venda.cancelada ? '#9CA3AF' : (parseFloat(venda.lucro) >= 0 ? '#15803D' : '#DC2626') }">
                 {{ formatarMoeda(venda.lucro) }}
               </td>
-              <td class="center">
-                <span :class="venda.cancelada ? 'badge-cancelada' : 'badge-ativa'">
-                  {{ venda.cancelada ? 'Cancelada' : 'Ativa' }}
-                </span>
-              </td>
-              <td>
-                <div style="font-size:0.8125rem; color:#374151;">
-                  <span style="color:#6B7280; font-size:0.75rem;">Compra</span><br>
-                  {{ formatarData(venda.created_at) }}
-                </div>
-                <div v-if="venda.cancelada_em" style="margin-top:6px; font-size:0.8125rem; color:#DC2626;">
-                  <span style="color:#9CA3AF; font-size:0.75rem;">Cancelamento</span><br>
-                  {{ formatarData(venda.cancelada_em) }}
-                </div>
-              </td>
+              <td class="center"><StatusBadge :cancelada="venda.cancelada" /></td>
+              <td><DataCell :data="venda.created_at" label-compra="Compra" :data-cancelamento="venda.cancelada_em" /></td>
             </tr>
           </tbody>
         </table>
@@ -172,6 +143,9 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import api from '../api'
 import { formatarMoeda } from '../utils/format'
+import ItemList   from '../components/ItemList.vue'
+import StatusBadge from '../components/StatusBadge.vue'
+import DataCell   from '../components/DataCell.vue'
 
 const produtos = ref([])
 const compras  = ref([])
@@ -266,10 +240,6 @@ const totalVendasCanceladas = computed(() =>
   vendasFiltradas.value.filter(v => v.cancelada).reduce((acc, v) => acc + parseFloat(v.total), 0)
 )
 
-function formatarData(dateStr) {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
-}
 </script>
 
 <style scoped>
@@ -340,24 +310,6 @@ function formatarData(dateStr) {
   margin-left: 8px;
   vertical-align: middle;
 }
-
-.lista-itens {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.lista-itens li {
-  font-size: 0.8125rem;
-  color: #374151;
-  white-space: nowrap;
-}
-
-.qtd   { color: #6B7280; }
-.preco { color: #9CA3AF; margin-left: 4px; }
 
 .td-vazio {
   text-align: center;

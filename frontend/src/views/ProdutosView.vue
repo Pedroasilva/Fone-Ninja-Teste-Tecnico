@@ -76,7 +76,7 @@
               <td class="right">{{ formatarMoeda(produto.custo_medio) }}</td>
               <td class="right">{{ formatarMoeda(produto.preco_venda) }}</td>
               <td class="center">{{ produto.estoque }}</td>
-              <td>{{ formatarData(produto.created_at) }}</td>
+              <td><DataCell :data="produto.created_at" /></td>
             </tr>
           </tbody>
         </table>
@@ -89,6 +89,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import api from '../api'
 import { formatarMoeda, valorParaMascara, onMoedaInput } from '../utils/format'
+import DataCell from '../components/DataCell.vue'
 
 const produtos        = ref([])
 const carregando      = ref(false)
@@ -126,11 +127,6 @@ function validar() {
   }
 
   return valido
-}
-
-function formatarData(dateStr) {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
 async function cadastrarProduto() {

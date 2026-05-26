@@ -135,38 +135,13 @@
             <tr v-for="venda in vendas" :key="venda.id">
               <td class="center">{{ venda.id }}</td>
               <td>{{ venda.cliente }}</td>
-              <td>
-                <ul style="margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:2px;">
-                  <li
-                    v-for="produto in venda.produtos"
-                    :key="produto.id"
-                    style="font-size:0.8125rem; color:#374151; white-space:nowrap;"
-                  >
-                    {{ produto.nome }}
-                    <span style="color:#6B7280;">× {{ produto.pivot.quantidade }}</span>
-                    <span style="color:#9CA3AF; margin-left:4px;">({{ formatarMoeda(produto.pivot.preco_unitario) }}/un)</span>
-                  </li>
-                </ul>
-              </td>
+              <td><ItemList :produtos="venda.produtos" /></td>
               <td class="right">{{ formatarMoeda(venda.total) }}</td>
               <td class="right" :style="{ color: parseFloat(venda.lucro) >= 0 ? '#15803D' : '#DC2626' }">
                 {{ formatarMoeda(venda.lucro) }}
               </td>
-              <td class="center">
-                <span :class="venda.cancelada ? 'badge-cancelada' : 'badge-ativa'">
-                  {{ venda.cancelada ? 'Cancelada' : 'Ativa' }}
-                </span>
-              </td>
-              <td>
-                <div style="font-size:0.8125rem; color:#374151;">
-                  <span style="color:#6B7280; font-size:0.75rem;">Compra</span><br>
-                  {{ formatarData(venda.created_at) }}
-                </div>
-                <div v-if="venda.cancelada_em" style="margin-top:6px; font-size:0.8125rem; color:#DC2626;">
-                  <span style="color:#9CA3AF; font-size:0.75rem;">Cancelamento</span><br>
-                  {{ formatarData(venda.cancelada_em) }}
-                </div>
-              </td>
+              <td class="center"><StatusBadge :cancelada="venda.cancelada" /></td>
+              <td><DataCell :data="venda.created_at" label-compra="Compra" :data-cancelamento="venda.cancelada_em" /></td>
               <td class="center">
                 <button
                   v-if="!venda.cancelada"
@@ -205,6 +180,9 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import api from '../api'
 import { formatarMoeda, valorParaMascara, onMoedaInput } from '../utils/format'
+import ItemList   from '../components/ItemList.vue'
+import StatusBadge from '../components/StatusBadge.vue'
+import DataCell   from '../components/DataCell.vue'
 
 const produtos        = ref([])
 const vendas          = ref([])
@@ -351,10 +329,6 @@ async function confirmarCancelamento() {
   }
 }
 
-function formatarData(dateStr) {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
-}
 </script>
 
 <style scoped>
