@@ -35,6 +35,18 @@
       </div>
     </div>
 
+    <!-- Botões de exportação -->
+    <div class="exportar-acoes">
+      <button class="btn-exportar btn-pdf" @click="exportarPDF">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        Exportar PDF
+      </button>
+      <button class="btn-exportar btn-excel" @click="exportarExcel">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+        Exportar Excel
+      </button>
+    </div>
+
     <!-- Cards de resumo -->
     <div class="resumo-grid">
       <div class="resumo-card">
@@ -146,6 +158,9 @@ import { formatarMoeda } from '../utils/format'
 import ItemList   from '../components/ItemList.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import DataCell   from '../components/DataCell.vue'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 
 const produtos = ref([])
 const compras  = ref([])
@@ -240,6 +255,136 @@ const totalVendasCanceladas = computed(() =>
   vendasFiltradas.value.filter(v => v.cancelada).reduce((acc, v) => acc + parseFloat(v.total), 0)
 )
 
+function formatarDataExport(dateStr) {
+  if (!dateStr) return '-'
+  return new Date(dateStr).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+}
+
+function itensTexto(produtos) {
+  return produtos.map(p => `${p.nome} × ${p.pivot.quantidade}`).join(', ')
+}
+
+function exportarPDF() {
+  const doc = new jsPDF({ orientation: 'landscape' })
+  const titulo = 'Relatório de Estoque'
+  const geradoEm = `Gerado em: ${new Date().toLocaleString('pt-BR')}`
+
+  doc.setFontSize(16)
+  doc.text(titulo, 14, 16)
+  doc.setFontSize(9)
+  doc.setTextColor(100)
+  doc.text(geradoEm, 14, 23)
+
+  // resumo
+  const resumo = [
+    ['Total em Compras', formatarMoeda(totalCompras.value), `${comprasFiltradas.value.length} compra(s)`],
+    ['Total em Vendas', formatarMoeda(totalVendas.value), `${vendasAtivas.value.length} venda(s) ativas`],
+    ['Lucro Total', formatarMoeda(lucroTotal.value), ''],
+    ['Vendas Canceladas', String(vendasFiltradas.value.filter(v => v.cancelada).length), formatarMoeda(totalVendasCanceladas.value) + ' revertidos'],
+  ]
+  autoTable(doc, {
+    startY: 28,
+    head: [['Indicador', 'Valor', 'Detalhe']],
+    body: resumo,
+    theme: 'grid',
+    headStyles: { fillColor: [30, 64, 175] },
+    styles: { fontSize: 8 },
+    margin: { left: 14, right: 14 },
+  })
+
+  // compras
+  const comprasY = doc.lastAutoTable.finalY + 10
+  doc.setFontSize(11)
+  doc.setTextColor(0)
+  doc.text(`Compras (${comprasFiltradas.value.length})`, 14, comprasY)
+  autoTable(doc, {
+    startY: comprasY + 4,
+    head: [['ID', 'Fornecedor', 'Itens', 'Total', 'Data']],
+    body: comprasFiltradas.value.map(c => [
+      String(c.id),
+      c.fornecedor,
+      itensTexto(c.produtos),
+      formatarMoeda(c.total),
+      formatarDataExport(c.created_at),
+    ]),
+    theme: 'striped',
+    headStyles: { fillColor: [30, 64, 175] },
+    styles: { fontSize: 8 },
+    columnStyles: { 2: { cellWidth: 80 } },
+    margin: { left: 14, right: 14 },
+  })
+
+  // vendas
+  const vendasY = doc.lastAutoTable.finalY + 10
+  doc.setFontSize(11)
+  doc.text(`Vendas (${vendasFiltradas.value.length})`, 14, vendasY)
+  autoTable(doc, {
+    startY: vendasY + 4,
+    head: [['ID', 'Cliente', 'Itens', 'Total', 'Lucro', 'Status', 'Data']],
+    body: vendasFiltradas.value.map(v => [
+      String(v.id),
+      v.cliente,
+      itensTexto(v.produtos),
+      formatarMoeda(v.total),
+      formatarMoeda(v.lucro),
+      v.cancelada ? 'Cancelada' : 'Ativa',
+      formatarDataExport(v.created_at),
+    ]),
+    theme: 'striped',
+    headStyles: { fillColor: [30, 64, 175] },
+    styles: { fontSize: 8 },
+    columnStyles: { 2: { cellWidth: 80 } },
+    margin: { left: 14, right: 14 },
+  })
+
+  doc.save('relatorio.pdf')
+}
+
+function exportarExcel() {
+  const wb = XLSX.utils.book_new()
+
+  // aba resumo
+  const resumoData = [
+    ['Indicador', 'Valor', 'Detalhe'],
+    ['Total em Compras', totalCompras.value, `${comprasFiltradas.value.length} compra(s)`],
+    ['Total em Vendas', totalVendas.value, `${vendasAtivas.value.length} venda(s) ativas`],
+    ['Lucro Total', lucroTotal.value, ''],
+    ['Vendas Canceladas', vendasFiltradas.value.filter(v => v.cancelada).length, `${totalVendasCanceladas.value} revertidos`],
+  ]
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumoData), 'Resumo')
+
+  // aba compras
+  const comprasData = [
+    ['ID', 'Fornecedor', 'Itens', 'Total', 'Data'],
+    ...comprasFiltradas.value.map(c => [
+      c.id,
+      c.fornecedor,
+      itensTexto(c.produtos),
+      parseFloat(c.total),
+      formatarDataExport(c.created_at),
+    ]),
+  ]
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(comprasData), 'Compras')
+
+  // aba vendas
+  const vendasData = [
+    ['ID', 'Cliente', 'Itens', 'Total', 'Lucro', 'Status', 'Data', 'Data Cancelamento'],
+    ...vendasFiltradas.value.map(v => [
+      v.id,
+      v.cliente,
+      itensTexto(v.produtos),
+      parseFloat(v.total),
+      parseFloat(v.lucro),
+      v.cancelada ? 'Cancelada' : 'Ativa',
+      formatarDataExport(v.created_at),
+      v.cancelada_em ? formatarDataExport(v.cancelada_em) : '',
+    ]),
+  ]
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(vendasData), 'Vendas')
+
+  XLSX.writeFile(wb, 'relatorio.xlsx')
+}
+
 </script>
 
 <style scoped>
@@ -319,5 +464,39 @@ const totalVendasCanceladas = computed(() =>
 
 .linha-cancelada td {
   opacity: 0.55;
+}
+
+.exportar-acoes {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-bottom: 24px;
+}
+
+.btn-exportar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn-exportar:hover {
+  opacity: 0.85;
+}
+
+.btn-pdf {
+  background: #DC2626;
+  color: #fff;
+}
+
+.btn-excel {
+  background: #15803D;
+  color: #fff;
 }
 </style>
