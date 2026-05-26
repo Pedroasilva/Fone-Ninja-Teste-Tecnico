@@ -94,4 +94,41 @@ class VendaServiceTest extends TestCase
         $this->expectException(ValidationException::class);
         $service->cancelar(1);
     }
+
+    public function test_cancelar_define_cancelada_em_e_reverte_estoque(): void
+    {
+        $produto          = new Produto();
+        $produto->id      = 1;
+        $produto->estoque = 10;
+
+        $pivotFake            = new \stdClass();
+        $pivotFake->quantidade = 3;
+
+        $produto->setRelation('pivot', (object) ['quantidade' => 3]);
+        $produtoComPivot = clone $produto;
+        $produtoComPivot->pivot = $pivotFake;
+
+        $venda            = new Venda();
+        $venda->cancelada = false;
+        $venda->setRelation('produtos', collect([$produtoComPivot]));
+
+        /** @var ProdutoRepositoryInterface&MockObject $produtoRepo */
+        $produtoRepo = $this->createMock(ProdutoRepositoryInterface::class);
+        /** @var VendaRepositoryInterface&MockObject $vendaRepo */
+        $vendaRepo = $this->createMock(VendaRepositoryInterface::class);
+
+        $vendaRepo->method('findWithProdutos')->willReturn($venda);
+        $produtoRepo->method('findForUpdate')->willReturn($produto);
+
+        $produtoRepo->expects($this->once())->method('save')
+            ->with($this->callback(fn ($p) => $p->estoque == 13));
+
+        $vendaRepo->expects($this->once())->method('save')
+            ->with($this->callback(fn ($v) => $v->cancelada === true && $v->cancelada_em !== null));
+
+        DB::shouldReceive('transaction')->andReturnUsing(fn ($cb) => $cb());
+
+        $service = new VendaService($produtoRepo, $vendaRepo);
+        $service->cancelar(1);
+    }
 }

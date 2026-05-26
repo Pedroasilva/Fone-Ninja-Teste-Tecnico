@@ -48,4 +48,24 @@ class ProdutoTest extends TestCase
              ->assertStatus(422)
              ->assertJsonValidationErrors(['preco_venda']);
     }
+
+    public function test_nome_duplicado_retorna_422(): void
+    {
+        $this->postJson('/api/produtos', ['nome' => 'Produto X', 'preco_venda' => 10.0])
+             ->assertStatus(201);
+
+        $this->postJson('/api/produtos', ['nome' => 'Produto X', 'preco_venda' => 20.0])
+             ->assertStatus(422)
+             ->assertJsonValidationErrors(['nome']);
+    }
+
+    public function test_listar_produtos_inclui_created_at(): void
+    {
+        $this->postJson('/api/produtos', ['nome' => 'Produto Data', 'preco_venda' => 5.0])
+             ->assertStatus(201);
+
+        $resposta = $this->getJson('/api/produtos')->assertStatus(200);
+
+        $this->assertNotNull($resposta->json('0.created_at'));
+    }
 }

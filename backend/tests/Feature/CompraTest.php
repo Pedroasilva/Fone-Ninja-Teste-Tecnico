@@ -60,7 +60,7 @@ class CompraTest extends TestCase
     public function test_compra_com_produto_inexistente_retorna_422(): void
     {
         $this->postJson('/api/compras', [
-            'fornecedor' => 'X',
+            'fornecedor' => 'Fornecedor X',
             'produtos'   => [['id' => 9999, 'quantidade' => 1, 'preco_unitario' => 10.0]],
         ])->assertStatus(422)->assertJsonValidationErrors(['produtos.0.id']);
     }
@@ -69,7 +69,7 @@ class CompraTest extends TestCase
     {
         $produto = $this->criarProduto();
         $this->postJson('/api/compras', [
-            'fornecedor' => 'X',
+            'fornecedor' => 'Fornecedor X',
             'produtos'   => [['id' => $produto->id, 'quantidade' => 1, 'preco_unitario' => 10.0]],
         ]);
 

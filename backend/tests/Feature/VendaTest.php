@@ -51,7 +51,7 @@ class VendaTest extends TestCase
         $produto = $this->criarProdutoComEstoque(estoque: 20, custo: 10.0);
 
         $vendaResposta = $this->postJson('/api/vendas', [
-            'cliente'  => 'Y',
+            'cliente'  => 'Cliente Y',
             'produtos' => [['id' => $produto->id, 'quantidade' => 5, 'preco_unitario' => 20.0]],
         ])->assertStatus(200);
 
@@ -70,7 +70,7 @@ class VendaTest extends TestCase
         $produto = $this->criarProdutoComEstoque(estoque: 20, custo: 10.0);
 
         $vendaResposta = $this->postJson('/api/vendas', [
-            'cliente'  => 'Y',
+            'cliente'  => 'Cliente Y',
             'produtos' => [['id' => $produto->id, 'quantidade' => 5, 'preco_unitario' => 20.0]],
         ]);
 
@@ -86,10 +86,53 @@ class VendaTest extends TestCase
         $produto = $this->criarProdutoComEstoque(estoque: 10, custo: 20.0);
 
         $resposta = $this->postJson('/api/vendas', [
-            'cliente'  => 'Y',
+            'cliente'  => 'Cliente Y',
             'produtos' => [['id' => $produto->id, 'quantidade' => 2, 'preco_unitario' => 10.0]],
         ])->assertStatus(200);
 
         $this->assertEqualsWithDelta(-20.0, $resposta->json('lucro'), 0.01);
+    }
+
+    public function test_listar_vendas_retorna_historico(): void
+    {
+        $produto = $this->criarProdutoComEstoque(estoque: 10, custo: 5.0);
+
+        $this->postJson('/api/vendas', [
+            'cliente'  => 'Cliente Z',
+            'produtos' => [['id' => $produto->id, 'quantidade' => 1, 'preco_unitario' => 10.0]],
+        ])->assertStatus(200);
+
+        $resposta = $this->getJson('/api/vendas')->assertStatus(200);
+
+        $this->assertCount(1, $resposta->json());
+        $this->assertEquals('Cliente Z', $resposta->json('0.cliente'));
+        $this->assertArrayHasKey('produtos', $resposta->json('0'));
+    }
+
+    public function test_cancelar_venda_registra_cancelada_em(): void
+    {
+        $produto = $this->criarProdutoComEstoque(estoque: 10, custo: 5.0);
+
+        $vendaResposta = $this->postJson('/api/vendas', [
+            'cliente'  => 'Cliente Y',
+            'produtos' => [['id' => $produto->id, 'quantidade' => 2, 'preco_unitario' => 10.0]],
+        ])->assertStatus(200);
+
+        $vendaId = $vendaResposta->json('venda.id');
+
+        $resposta = $this->deleteJson("/api/vendas/{$vendaId}")->assertStatus(200);
+
+        $this->assertNotNull($resposta->json('venda.cancelada_em'));
+    }
+
+    public function test_venda_com_cliente_curto_retorna_422(): void
+    {
+        $produto = $this->criarProdutoComEstoque(estoque: 10, custo: 5.0);
+
+        $this->postJson('/api/vendas', [
+            'cliente'  => 'A',
+            'produtos' => [['id' => $produto->id, 'quantidade' => 1, 'preco_unitario' => 10.0]],
+        ])->assertStatus(422)
+          ->assertJsonValidationErrors(['cliente']);
     }
 }
